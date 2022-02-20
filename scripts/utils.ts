@@ -1,5 +1,5 @@
-import { Signer } from "ethers";
 import { ethers } from "hardhat";
+import { Signer } from "ethers";
 
 const UNISWAP_ABI = [
     "function swapExactETHForTokensSupportingFeeOnTransferTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)"
@@ -16,6 +16,21 @@ export const makeSwap = async (signer: Signer, path: string[], value: string) =>
         .swapExactETHForTokensSupportingFeeOnTransferTokens(
             0, path, await signer.getAddress(), 9999999999
         , { value: ethers.utils.parseEther(value)});    
+}
+
+export const getBalance = async (token: string, account: string) => {
+    const contract = new ethers.Contract(token, TOKEN_ABI, ethers.provider);
+    return await contract.balanceOf(account);
+}
+
+export const approve = async (token: string, from: Signer, to: string, amount: string) => {
+    const contract = new ethers.Contract(token, TOKEN_ABI, ethers.provider);
+    return await contract.connect(from).approve(to, amount);
+}
+
+export const transfer = async (token: string, from: Signer, to: string, amount: string) => {
+    const contract = new ethers.Contract(token, TOKEN_ABI, ethers.provider);
+    return await contract.connect(from).transfer(to, amount);
 }
 
 export const TOKEN_ABI = [

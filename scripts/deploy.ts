@@ -7,7 +7,7 @@ import { ethers } from "hardhat";
 import { makeSwap, TOKEN_ABI } from "./utils";
 
 const WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
-const QFI = "0x6fe88a211863d0d818608036880c9a4b0ea86795";
+const SAITAMA = "0xC795fBa221f7920F1C6ac0f1598886742D8Ea661";
 const SHIB = "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE";
 
 async function main() {
@@ -25,20 +25,20 @@ async function main() {
   const MultiStake = await ethers.getContractFactory("MultiRewardsStake");
   const multiStake = await MultiStake.deploy(
     accounts[0].address,
-    [QFI, SHIB],
-    QFI
+    [SAITAMA, SHIB],
+    SAITAMA
   );
 
   await multiStake.deployed();
 
-  await makeSwap(accounts[0], [WETH, QFI], '4.0');
+  await makeSwap(accounts[0], [WETH, SAITAMA], '4.0');
   await makeSwap(accounts[0], [WETH, SHIB], '4.0');
 
-  await makeSwap(accounts[1], [WETH, QFI], '1.0');
+  await makeSwap(accounts[1], [WETH, SAITAMA], '1.0');
 
   await ethers.provider.send("evm_mine", []);
 
-  const qfiContract = new ethers.Contract(QFI, TOKEN_ABI, ethers.provider);
+  const qfiContract = new ethers.Contract(SAITAMA, TOKEN_ABI, ethers.provider);
   const shibContract = new ethers.Contract(SHIB, TOKEN_ABI, ethers.provider);
 
   const qfiBalance = await qfiContract.balanceOf(accounts[0].address);
