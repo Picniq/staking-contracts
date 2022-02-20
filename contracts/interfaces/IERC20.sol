@@ -18,6 +18,11 @@ interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
 
     /**
+     * @dev Returns the amount of decimals in the token
+     */
+    function decimals() external view returns (uint256);
+
+    /**
      * @dev Moves `amount` tokens from the caller's account to `to`.
      *
      * Returns a boolean value indicating whether the operation succeeded.
