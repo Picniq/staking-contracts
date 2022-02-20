@@ -94,7 +94,7 @@ contract MultiRewardsStake is ReentrancyGuard {
                     lastTimeRewardApplicable()
                     .sub(lastUpdateTime)
                     .mul(rewardToken.rewardRate)
-                    .mul(1e18)
+                    .mul(10 ** IERC20(rewardToken.token).decimals())
                     .div(_totalSupply)
                 );
             }
@@ -113,7 +113,7 @@ contract MultiRewardsStake is ReentrancyGuard {
                 lastTimeRewardApplicable()
                 .sub(lastUpdateTime)
                 .mul(_rewardTokens[index].rewardRate)
-                .mul(1e18)
+                .mul(10 ** IERC20(_rewardTokens[index].token).decimals())
                 .div(_totalSupply)
             );
         }
@@ -137,7 +137,7 @@ contract MultiRewardsStake is ReentrancyGuard {
                 .mul(tokenRewards[i]
                     .sub(_userRewardPerTokenPaid[account][token])
                 )
-                .div(1e18)
+                .div(10 ** IERC20(token).decimals())
                 .add(_rewards[account][token]
             );
         }
@@ -212,7 +212,7 @@ contract MultiRewardsStake is ReentrancyGuard {
         emit RewardAdded(reward);
     }
 
-    function addRewardToken(address token) external onlyDistributor updateReward(address(0)) {
+    function addRewardToken(address token) external onlyDistributor {
         require(_totalRewardTokens < 6, "Too many tokens");
         require(IERC20(token).balanceOf(address(this)) > 0, "Must prefund contract");
 
@@ -233,12 +233,13 @@ contract MultiRewardsStake is ReentrancyGuard {
         for (uint i = 0; i < _totalRewardTokens; i++) {
             if (i == _totalRewardTokens - 1) {
                 rewardAmounts[i] = IERC20(token).balanceOf(address(this));
-            } else {
-                rewardAmounts[i] = IERC20(_rewardTokens[i + 1].token).balanceOf(address(this));
-                if (_rewardTokens[i + 1].token == address(stakingToken)) {
-                    rewardAmounts[i] = rewardAmounts[i].sub(_totalSupply);
-                }
             }
+            // else {
+            //     rewardAmounts[i] = IERC20(_rewardTokens[i + 1].token).balanceOf(address(this));
+            //     if (_rewardTokens[i + 1].token == address(stakingToken)) {
+            //         rewardAmounts[i] = rewardAmounts[i].sub(_totalSupply);
+            //     }
+            // }
         }
 
         notifyRewardAmount(rewardAmounts);
@@ -277,15 +278,15 @@ contract MultiRewardsStake is ReentrancyGuard {
     /* === MODIFIERS === */
 
     modifier updateReward(address account) {
-        uint256[] memory currentRewardPerToken = rewardPerToken();
+        uint256[] memory rewardsPerToken = rewardPerToken();
         uint256[] memory currentEarnings = earned(account);
         lastUpdateTime = lastTimeRewardApplicable();
         for (uint i = 0; i < _totalRewardTokens; i++) {
             RewardToken storage rewardToken = _rewardTokens[i + 1];
-            rewardToken.rewardPerTokenStored = currentRewardPerToken[i];
+            rewardToken.rewardPerTokenStored = rewardsPerToken[i];
             if (account != address(0)) {
                 _rewards[account][rewardToken.token] = currentEarnings[i];
-                _userRewardPerTokenPaid[account][rewardToken.token] = currentRewardPerToken[i];                
+                _userRewardPerTokenPaid[account][rewardToken.token] = rewardsPerToken[i];                
             }
         }
         _;
