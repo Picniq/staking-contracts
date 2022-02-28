@@ -2,15 +2,15 @@
 
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
 import "./helpers/ReentrancyGuard.sol";
+import "./helpers/Ownable.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/Math.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/SafeERC20.sol";
 
 //solhint-disable not-rely-on-time
-contract MultiRewardsStake is ReentrancyGuard {
+contract MultiRewardsStake is ReentrancyGuard, Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -19,7 +19,6 @@ contract MultiRewardsStake is ReentrancyGuard {
     uint256 public periodFinish;
     uint256 public rewardsDuration;
     uint256 public lastUpdateTime;
-    address public rewardsDistributor;
     
     // User reward info
     mapping(address => mapping (address => uint256)) private _userRewardPerTokenPaid;
@@ -42,11 +41,9 @@ contract MultiRewardsStake is ReentrancyGuard {
     }
 
     constructor(
-        address rewardsDistributor_,
         address[] memory rewardTokens_,
         address stakingToken_
     ) {
-        rewardsDistributor = rewardsDistributor_;
         stakingToken = IERC20(stakingToken_);
         _totalRewardTokens = rewardTokens_.length;
 
@@ -59,7 +56,7 @@ contract MultiRewardsStake is ReentrancyGuard {
             _rewardTokenToIndex[rewardTokens_[i]] = i + 1;
         }
 
-        rewardsDuration = 7 days;
+        rewardsDuration = 14 days;
     }
 
     /* VIEWS */
@@ -94,7 +91,7 @@ contract MultiRewardsStake is ReentrancyGuard {
                     lastTimeRewardApplicable()
                     .sub(lastUpdateTime)
                     .mul(rewardToken.rewardRate)
-                    .mul(10 ** IERC20(rewardToken.token).decimals())
+                    .mul(1e18)
                     .div(_totalSupply)
                 );
             }
@@ -113,7 +110,7 @@ contract MultiRewardsStake is ReentrancyGuard {
                 lastTimeRewardApplicable()
                 .sub(lastUpdateTime)
                 .mul(_rewardTokens[index].rewardRate)
-                .mul(10 ** IERC20(_rewardTokens[index].token).decimals())
+                .mul(1e18)
                 .div(_totalSupply)
             );
         }
@@ -137,7 +134,7 @@ contract MultiRewardsStake is ReentrancyGuard {
                 .mul(tokenRewards[i]
                     .sub(_userRewardPerTokenPaid[account][token])
                 )
-                .div(10 ** IERC20(token).decimals())
+                .div(1e18)
                 .add(_rewards[account][token]
             );
         }
@@ -158,9 +155,12 @@ contract MultiRewardsStake is ReentrancyGuard {
 
     function stake(uint256 amount) external nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
-        _totalSupply = _totalSupply.add(amount);
-        _balances[msg.sender] = _balances[msg.sender].add(amount);
+        uint256 currentBalance = stakingToken.balanceOf(address(this));
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 newBalance = stakingToken.balanceOf(address(this));
+        uint256 supplyDiff = newBalance.sub(currentBalance);
+        _totalSupply = _totalSupply.add(supplyDiff);
+        _balances[msg.sender] = _balances[msg.sender].add(supplyDiff);
         emit Staked(msg.sender, amount);
     }
 
@@ -190,7 +190,35 @@ contract MultiRewardsStake is ReentrancyGuard {
 
     /* === RESTRICTED FUNCTIONS === */
 
-    function notifyRewardAmount(uint256[] memory reward) public onlyDistributor updateReward(address(0)) {
+    function depositRewardTokens(uint256[] memory amount) external onlyOwner {
+        require(amount.length == _totalRewardTokens, "Wrong amounts");
+
+        // uint256[] memory newRewards = new uint256[](_totalRewardTokens);
+        for (uint i = 0; i < _totalRewardTokens; i++) {
+            RewardToken storage rewardToken = _rewardTokens[i + 1];
+            uint256 prevBalance = IERC20(rewardToken.token).balanceOf(address(this));
+            IERC20(rewardToken.token).safeTransferFrom(msg.sender, address(this), amount[i]);
+            uint reward = IERC20(rewardToken.token).balanceOf(address(this)).sub(prevBalance);
+            if (block.timestamp >= periodFinish) {
+                rewardToken.rewardRate = reward.div(rewardsDuration);
+            } else {
+                uint256 remaining = periodFinish.sub(block.timestamp);
+                uint256 leftover = remaining.mul(rewardToken.rewardRate);
+                rewardToken.rewardRate = reward.add(leftover).div(rewardsDuration);
+            }
+
+            uint256 balance = IERC20(rewardToken.token).balanceOf(address(this));
+            require(rewardToken.rewardRate <= balance.div(rewardsDuration), "Reward too high");
+            emit RewardAdded(reward);
+        }
+
+        lastUpdateTime = block.timestamp;
+        periodFinish = block.timestamp.add(rewardsDuration);
+
+        // notifyRewardAmount(newRewards);
+    }
+
+    function notifyRewardAmount(uint256[] memory reward) public onlyOwner updateReward(address(0)) {
         require(reward.length == _totalRewardTokens, "Wrong reward amounts");
         for (uint i = 0; i < _totalRewardTokens; i++) {
             RewardToken storage rewardToken = _rewardTokens[i + 1];
@@ -204,15 +232,14 @@ contract MultiRewardsStake is ReentrancyGuard {
 
             uint256 balance = IERC20(rewardToken.token).balanceOf(address(this));
             require(rewardToken.rewardRate <= balance.div(rewardsDuration), "Reward too high");
+            emit RewardAdded(reward[i]);
         }
 
         lastUpdateTime = block.timestamp;
         periodFinish = block.timestamp.add(rewardsDuration);
-
-        emit RewardAdded(reward);
     }
 
-    function addRewardToken(address token) external onlyDistributor {
+    function addRewardToken(address token) external onlyOwner {
         require(_totalRewardTokens < 6, "Too many tokens");
         require(IERC20(token).balanceOf(address(this)) > 0, "Must prefund contract");
 
@@ -234,18 +261,12 @@ contract MultiRewardsStake is ReentrancyGuard {
             if (i == _totalRewardTokens - 1) {
                 rewardAmounts[i] = IERC20(token).balanceOf(address(this));
             }
-            // else {
-            //     rewardAmounts[i] = IERC20(_rewardTokens[i + 1].token).balanceOf(address(this));
-            //     if (_rewardTokens[i + 1].token == address(stakingToken)) {
-            //         rewardAmounts[i] = rewardAmounts[i].sub(_totalSupply);
-            //     }
-            // }
         }
 
         notifyRewardAmount(rewardAmounts);
     }
 
-    function removeRewardToken(address token) public onlyDistributor updateReward(address(0)) {
+    function removeRewardToken(address token) public onlyOwner updateReward(address(0)) {
         require(_totalRewardTokens > 1, "Cannot have 0 reward tokens");
         // Get the index of token to remove
         uint indexToDelete = _rewardTokenToIndex[token];
@@ -268,10 +289,10 @@ contract MultiRewardsStake is ReentrancyGuard {
         _totalRewardTokens -= 1;
     }
 
-    function emergencyWithdrawal(address token) external onlyDistributor updateReward(address(0)) {
+    function emergencyWithdrawal(address token) external onlyOwner updateReward(address(0)) {
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance > 0, "Contract holds no tokens");
-        IERC20(token).transfer(rewardsDistributor, balance);
+        IERC20(token).transfer(owner(), balance);
         removeRewardToken(token);
     }
 
@@ -292,14 +313,9 @@ contract MultiRewardsStake is ReentrancyGuard {
         _;
     }
 
-    modifier onlyDistributor() {
-        require(msg.sender == rewardsDistributor, "Call not distributor");
-        _;
-    }
-
     /* === EVENTS === */
 
-    event RewardAdded(uint256[] reward);
+    event RewardAdded(uint256 reward);
     event Staked(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
