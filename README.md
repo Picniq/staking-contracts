@@ -17,4 +17,5 @@ The multi-reward staking needs the following additions and optimizations:
 - General gas optimizations. Review data structure and determine if most efficient for 2+ tokens. Identify any other potential savings.
 - Add and remove tokens. Allow the `distributor` address to adjust the tokens. Add token is present but untested.
 - Enable `distributor` address to withdraw ERC20 tokens in case of error, accidental transfers or on reward token removal.
-- Complete final testing.
+- Testing for single asset staking pool (Stake.sol)
+- Single asset staking doesn't support tax tokens. Please be careful and test thoroughly.
