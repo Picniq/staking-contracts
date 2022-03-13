@@ -47,13 +47,15 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
         stakingToken = IERC20(stakingToken_);
         _totalRewardTokens = rewardTokens_.length;
 
-        for (uint i; i < rewardTokens_.length; i++) {
+        for (uint i; i < _totalRewardTokens;) {
             _rewardTokens[i + 1] = RewardToken({
                 token: rewardTokens_[i],
                 rewardRate: 0,
                 rewardPerTokenStored: 0
             });
             _rewardTokenToIndex[rewardTokens_[i]] = i + 1;
+
+            unchecked { ++i; }
         }
 
         rewardsDuration = 14 days;
@@ -78,45 +80,37 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
     }
 
     // Get reward rate for all tokens
-    function rewardPerToken() public view returns (uint256[] memory) {
+    function rewardPerToken() external view returns (uint256[] memory) {
         uint256[] memory tokens = new uint256[](_totalRewardTokens);
-        if (_totalSupply == 0) {
-            for (uint i = 0; i < _totalRewardTokens; i++) {
-                tokens[i] = _rewardTokens[i + 1].rewardPerTokenStored;
-            }
-        } else {
-            for (uint i = 0; i < _totalRewardTokens; i++) {
-                RewardToken storage rewardToken = _rewardTokens[i + 1];
-                tokens[i] = rewardToken.rewardPerTokenStored.add(
-                    lastTimeRewardApplicable()
-                    .sub(lastUpdateTime)
-                    .mul(rewardToken.rewardRate)
-                    .mul(1e18)
-                    .div(_totalSupply)
-                );
-            }
+        for (uint i = 0; i < _totalRewardTokens;) {
+            tokens[i] = _rewardPerTokenStored(i + 1);
+            unchecked { ++i; }
         }
 
         return tokens;
     }
 
     // Get reward rate for individual token
-    function rewardForToken(address token) public view returns (uint256) {
+    function rewardForToken(address token) external view returns (uint256) {
         uint256 index = _rewardTokenToIndex[token];
-        if (_totalSupply == 0) {
-            return _rewardTokens[index].rewardPerTokenStored;
-        } else {
-            return _rewardTokens[index].rewardPerTokenStored.add(
-                lastTimeRewardApplicable()
-                .sub(lastUpdateTime)
-                .mul(_rewardTokens[index].rewardRate)
-                .mul(1e18)
-                .div(_totalSupply)
-            );
-        }
+        return _rewardPerTokenStored(index);
     }
 
-    function getRewardTokens() public view returns (RewardToken[] memory) {
+    // Internal function to calculate rewardPerTokenStored
+    function _rewardPerTokenStored(uint tokenIndex) private view returns (uint256) {
+        if (_totalSupply == 0) {
+            return _rewardTokens[tokenIndex].rewardPerTokenStored;
+        }
+        return _rewardTokens[tokenIndex].rewardPerTokenStored.add(
+            lastTimeRewardApplicable()
+            .sub(lastUpdateTime)
+            .mul(_rewardTokens[tokenIndex].rewardRate)
+            .mul(1e18)
+            .div(_totalSupply)
+        );
+    }
+
+    function getRewardTokens() external view returns (RewardToken[] memory) {
         RewardToken[] memory tokens = new RewardToken[](_totalRewardTokens);
         for (uint i = 0; i < _totalRewardTokens; i++) {
             tokens[i] = _rewardTokens[i + 1];
@@ -125,27 +119,34 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
         return tokens;
     }
 
-    function earned(address account) public view returns (uint256[] memory) {
+    function earned(address account) external view returns (uint256[] memory) {
         uint256[] memory earnings = new uint256[](_totalRewardTokens);
-        uint256[] memory tokenRewards = rewardPerToken();
-        for (uint i = 0; i < _totalRewardTokens; i++) {
-            address token = _rewardTokens[i + 1].token;
-            earnings[i] = _balances[account]
-                .mul(tokenRewards[i]
-                    .sub(_userRewardPerTokenPaid[account][token])
-                )
-                .div(1e18)
-                .add(_rewards[account][token]
-            );
+        for (uint i = 0; i < _totalRewardTokens;) {
+            earnings[i] = _earned(account, i + 1);
+
+            unchecked { ++i; }
         }
 
         return earnings;
     }
 
+    function _earned(address account, uint256 tokenIndex) private view returns (uint256) {
+        address token = _rewardTokens[tokenIndex].token;
+        uint256 tokenReward = _rewardPerTokenStored(tokenIndex);
+        return _balances[account].mul(tokenReward
+            .sub(
+                _userRewardPerTokenPaid[account][token])
+            )
+            .div(1e18)
+            .add(_rewards[account][token]
+        );
+    }
+
     function getRewardForDuration() external view returns (uint256[] memory) {
         uint256[] memory currentRewards = new uint256[](_totalRewardTokens);
-        for (uint i = 0; i < _totalRewardTokens; i++) {
+        for (uint i = 0; i < _totalRewardTokens;) {
             currentRewards[i] = _rewardTokens[i + 1].rewardRate.mul(rewardsDuration);
+            unchecked { ++i; }
         }
 
         return currentRewards;
@@ -173,13 +174,15 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
     }
 
     function getReward() public nonReentrant updateReward(msg.sender) {
-        for (uint i = 0; i < _totalRewardTokens; i++) {
+        for (uint i = 0; i < _totalRewardTokens;) {
             uint256 currentReward = _rewards[msg.sender][_rewardTokens[i + 1].token];
             if (currentReward > 0) {
                 _rewards[msg.sender][_rewardTokens[i + 1].token] = 0;
                 IERC20(_rewardTokens[i + 1].token).safeTransfer(msg.sender, currentReward);
                 emit RewardPaid(msg.sender, currentReward);
             }
+
+            unchecked { ++i; }
         }
     }
 
@@ -193,8 +196,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
     function depositRewardTokens(uint256[] memory amount) external onlyOwner {
         require(amount.length == _totalRewardTokens, "Wrong amounts");
 
-        // uint256[] memory newRewards = new uint256[](_totalRewardTokens);
-        for (uint i = 0; i < _totalRewardTokens; i++) {
+        for (uint i = 0; i < _totalRewardTokens;) {
             RewardToken storage rewardToken = _rewardTokens[i + 1];
             uint256 prevBalance = IERC20(rewardToken.token).balanceOf(address(this));
             IERC20(rewardToken.token).safeTransferFrom(msg.sender, address(this), amount[i]);
@@ -210,6 +212,8 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
             uint256 balance = IERC20(rewardToken.token).balanceOf(address(this));
             require(rewardToken.rewardRate <= balance.div(rewardsDuration), "Reward too high");
             emit RewardAdded(reward);
+
+            unchecked { ++i; }
         }
 
         lastUpdateTime = block.timestamp;
@@ -220,7 +224,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
 
     function notifyRewardAmount(uint256[] memory reward) public onlyOwner updateReward(address(0)) {
         require(reward.length == _totalRewardTokens, "Wrong reward amounts");
-        for (uint i = 0; i < _totalRewardTokens; i++) {
+        for (uint i = 0; i < _totalRewardTokens;) {
             RewardToken storage rewardToken = _rewardTokens[i + 1];
             if (block.timestamp >= periodFinish) {
                 rewardToken.rewardRate = reward[i].div(rewardsDuration);
@@ -233,6 +237,8 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
             uint256 balance = IERC20(rewardToken.token).balanceOf(address(this));
             require(rewardToken.rewardRate <= balance.div(rewardsDuration), "Reward too high");
             emit RewardAdded(reward[i]);
+
+            unchecked { ++i; }
         }
 
         lastUpdateTime = block.timestamp;
@@ -242,6 +248,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
     function addRewardToken(address token) external onlyOwner {
         require(_totalRewardTokens < 6, "Too many tokens");
         require(IERC20(token).balanceOf(address(this)) > 0, "Must prefund contract");
+        require(_rewardTokenToIndex[token] == 0, "Reward token exists");
 
         // Increment total reward tokens
         _totalRewardTokens += 1;
@@ -257,10 +264,13 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
 
         uint256[] memory rewardAmounts = new uint256[](_totalRewardTokens);
 
-        for (uint i = 0; i < _totalRewardTokens; i++) {
-            if (i == _totalRewardTokens - 1) {
-                rewardAmounts[i] = IERC20(token).balanceOf(address(this));
-            }
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 tokenIndex = _totalRewardTokens - 1;
+        if (token != address(stakingToken)) {
+            rewardAmounts[tokenIndex] = balance;
+        } else {
+            require(balance >= rewardAmounts[tokenIndex], "Not enough for rewards");
+            rewardAmounts[tokenIndex] = balance.sub(_totalSupply);
         }
 
         notifyRewardAmount(rewardAmounts);
@@ -272,7 +282,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
         uint indexToDelete = _rewardTokenToIndex[token];
 
         // Start at index of token to remove. Remove token and move all later indices lower.
-        for (uint i = indexToDelete; i <= _totalRewardTokens; i++) {
+        for (uint i = indexToDelete; i <= _totalRewardTokens;) {
             // Get token of one later index
             RewardToken storage rewardToken = _rewardTokens[i + 1];
 
@@ -284,31 +294,41 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
 
             // Set new index
             _rewardTokenToIndex[rewardToken.token] = i;
+
+            unchecked { ++i; }
         }
 
         _totalRewardTokens -= 1;
     }
 
     function emergencyWithdrawal(address token) external onlyOwner updateReward(address(0)) {
+        require(_rewardTokenToIndex[token] != 0, "Not a reward token");
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance > 0, "Contract holds no tokens");
-        IERC20(token).transfer(owner(), balance);
+        if (address(stakingToken) == token) {
+            uint256 amountToWithdraw = balance.sub(_totalSupply);
+            IERC20(token).safeTransfer(owner(), amountToWithdraw);
+        } else {
+            IERC20(token).safeTransfer(owner(), balance);
+        }
         removeRewardToken(token);
     }
 
     /* === MODIFIERS === */
 
     modifier updateReward(address account) {
-        uint256[] memory rewardsPerToken = rewardPerToken();
-        uint256[] memory currentEarnings = earned(account);
         lastUpdateTime = lastTimeRewardApplicable();
-        for (uint i = 0; i < _totalRewardTokens; i++) {
-            RewardToken storage rewardToken = _rewardTokens[i + 1];
-            rewardToken.rewardPerTokenStored = rewardsPerToken[i];
+        for (uint i = 0; i < _totalRewardTokens;) {
+            uint256 index = i + 1;
+            uint256 rewardPerTokenStored = _rewardPerTokenStored(index);
+            RewardToken storage rewardToken = _rewardTokens[index];
+            rewardToken.rewardPerTokenStored = rewardPerTokenStored;
             if (account != address(0)) {
-                _rewards[account][rewardToken.token] = currentEarnings[i];
-                _userRewardPerTokenPaid[account][rewardToken.token] = rewardsPerToken[i];                
+                _rewards[account][rewardToken.token] = _earned(account, index);
+                _userRewardPerTokenPaid[account][rewardToken.token] = rewardPerTokenStored;                
             }
+
+            unchecked { ++i; }
         }
         _;
     }
