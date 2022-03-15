@@ -154,7 +154,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
 
     /* === MUTATIONS === */
 
-    function stake(uint256 amount) external nonReentrant updateReward(msg.sender) {
+    function stake(uint256 amount) external payable nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
         uint256 currentBalance = stakingToken.balanceOf(address(this));
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -165,7 +165,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
         emit Staked(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) public nonReentrant updateReward(msg.sender) {
+    function withdraw(uint256 amount) public payable nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot withdraw 0");
         _totalSupply = _totalSupply.sub(amount);
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
@@ -173,7 +173,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
         emit Withdrawn(msg.sender, amount);
     }
 
-    function getReward() public nonReentrant updateReward(msg.sender) {
+    function getReward() public payable nonReentrant updateReward(msg.sender) {
         for (uint i = 0; i < _totalRewardTokens;) {
             uint256 currentReward = _rewards[msg.sender][_rewardTokens[i + 1].token];
             if (currentReward > 0) {
@@ -186,14 +186,14 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
         }
     }
 
-    function exit() external {
+    function exit() external payable {
         withdraw(_balances[msg.sender]);
         getReward();
     }
 
     /* === RESTRICTED FUNCTIONS === */
 
-    function depositRewardTokens(uint256[] memory amount) external onlyOwner {
+    function depositRewardTokens(uint256[] memory amount) external payable onlyOwner {
         require(amount.length == _totalRewardTokens, "Wrong amounts");
 
         for (uint i = 0; i < _totalRewardTokens;) {
@@ -222,7 +222,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
         // notifyRewardAmount(newRewards);
     }
 
-    function notifyRewardAmount(uint256[] memory reward) public onlyOwner updateReward(address(0)) {
+    function notifyRewardAmount(uint256[] memory reward) public payable onlyOwner updateReward(address(0)) {
         require(reward.length == _totalRewardTokens, "Wrong reward amounts");
         for (uint i = 0; i < _totalRewardTokens;) {
             RewardToken storage rewardToken = _rewardTokens[i + 1];
@@ -245,7 +245,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
         periodFinish = block.timestamp.add(rewardsDuration);
     }
 
-    function addRewardToken(address token) external onlyOwner {
+    function addRewardToken(address token) external payable onlyOwner {
         require(_totalRewardTokens < 6, "Too many tokens");
         require(IERC20(token).balanceOf(address(this)) > 0, "Must prefund contract");
         require(_rewardTokenToIndex[token] == 0, "Reward token exists");
@@ -276,7 +276,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
         notifyRewardAmount(rewardAmounts);
     }
 
-    function removeRewardToken(address token) public onlyOwner updateReward(address(0)) {
+    function removeRewardToken(address token) public payable onlyOwner updateReward(address(0)) {
         require(_totalRewardTokens > 1, "Cannot have 0 reward tokens");
         // Get the index of token to remove
         uint indexToDelete = _rewardTokenToIndex[token];
@@ -301,7 +301,7 @@ contract MultiRewardsStake is ReentrancyGuard, Ownable {
         _totalRewardTokens -= 1;
     }
 
-    function emergencyWithdrawal(address token) external onlyOwner updateReward(address(0)) {
+    function emergencyWithdrawal(address token) external payable onlyOwner updateReward(address(0)) {
         require(_rewardTokenToIndex[token] != 0, "Not a reward token");
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance > 0, "Contract holds no tokens");
