@@ -1,16 +1,14 @@
-//SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: MIT
 
-import "hardhat/console.sol";
+pragma solidity 0.8.13;
+
 import "./helpers/ReentrancyGuard.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/Math.sol";
-import "./libraries/SafeMath.sol";
 import "./libraries/SafeERC20.sol";
 
 //solhint-disable not-rely-on-time
 contract StandardStake is ReentrancyGuard {
-    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     /* ========== STATE VARIABLES ========== */
@@ -63,42 +61,49 @@ contract StandardStake is ReentrancyGuard {
             return rewardPerTokenStored;
         }
         return
-            rewardPerTokenStored.add(
-                lastTimeRewardApplicable().sub(lastUpdateTime).mul(rewardRate).mul(1e18).div(_totalSupply)
+            rewardPerTokenStored + (
+                (lastTimeRewardApplicable() - lastUpdateTime) * rewardRate * 1e18 / _totalSupply
             );
     }
 
     function earned(address account) public view returns (uint256) {
-        return _balances[account].mul(rewardPerToken().sub(userRewardPerTokenPaid[account])).div(1e18).add(rewards[account]);
+        return _balances[account] * (
+            rewardPerToken() - userRewardPerTokenPaid[account]
+        ) / 1e18 + rewards[account];
     }
 
     function getRewardForDuration() external view returns (uint256) {
-        return rewardRate.mul(rewardsDuration);
+        return rewardRate * rewardsDuration;
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     function stake(uint256 amount) external nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
-        _totalSupply = _totalSupply.add(amount);
-        _balances[msg.sender] = _balances[msg.sender].add(amount);
+        _totalSupply = _totalSupply + amount;
+        _balances[msg.sender] = _balances[msg.sender] + amount;
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+
         emit Staked(msg.sender, amount);
     }
 
     function withdraw(uint256 amount) public nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot withdraw 0");
-        _totalSupply = _totalSupply.sub(amount);
-        _balances[msg.sender] = _balances[msg.sender].sub(amount);
+
+        _totalSupply = _totalSupply - amount;
+        _balances[msg.sender] = _balances[msg.sender] - amount;
         stakingToken.safeTransfer(msg.sender, amount);
+
         emit Withdrawn(msg.sender, amount);
     }
 
     function getReward() public nonReentrant updateReward(msg.sender) {
         uint256 reward = rewards[msg.sender];
+
         if (reward > 0) {
             rewards[msg.sender] = 0;
             rewardsToken.safeTransfer(msg.sender, reward);
+
             emit RewardPaid(msg.sender, reward);
         }
     }
@@ -112,11 +117,11 @@ contract StandardStake is ReentrancyGuard {
 
     function notifyRewardAmount(uint256 reward) external onlyRewardsDistribution updateReward(address(0)) {
         if (block.timestamp >= periodFinish) {
-            rewardRate = reward.div(rewardsDuration);
+            rewardRate = reward / rewardsDuration;
         } else {
-            uint256 remaining = periodFinish.sub(block.timestamp);
-            uint256 leftover = remaining.mul(rewardRate);
-            rewardRate = reward.add(leftover).div(rewardsDuration);
+            uint256 remaining = periodFinish - block.timestamp;
+            uint256 leftover = remaining * rewardRate;
+            rewardRate = (reward + leftover) / rewardsDuration;
         }
 
         // Ensure the provided reward amount is not more than the balance in the contract.
@@ -124,10 +129,12 @@ contract StandardStake is ReentrancyGuard {
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
         uint balance = rewardsToken.balanceOf(address(this));
-        require(rewardRate <= balance.div(rewardsDuration), "Provided reward too high");
+
+        require(rewardRate <= balance / rewardsDuration, "Provided reward too high");
 
         lastUpdateTime = block.timestamp;
-        periodFinish = block.timestamp.add(rewardsDuration);
+        periodFinish = block.timestamp + rewardsDuration;
+
         emit RewardAdded(reward);
     }
 
@@ -136,6 +143,7 @@ contract StandardStake is ReentrancyGuard {
     modifier updateReward(address account) {
         rewardPerTokenStored = rewardPerToken();
         lastUpdateTime = lastTimeRewardApplicable();
+
         if (account != address(0)) {
             rewards[account] = earned(account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
