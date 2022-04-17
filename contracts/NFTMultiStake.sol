@@ -191,11 +191,25 @@ contract NFTMultiStake is ReentrancyGuard, Ownable {
     function withdraw(uint256 index) public payable nonReentrant updateReward(msg.sender)
     {
         require(_balances[msg.sender].length > 0, "No NFTs staked");
+        require(index <= _balances[msg.sender].length, "Index out of range");
+
+        // Update total staked amount
         _totalSupply -= 1;
-        uint256[] memory staked = _balances[msg.sender];
+
+        // Get staked ids for user from storage
+        uint256[] storage staked = _balances[msg.sender];
+
+        // Save 
         uint256 id = staked[index];
+
+        // Save last item in array to index to be unstaked
+        staked[index] = staked[staked.length - 1];
+
+        // Remove last item of array
+        staked.pop();
+
+        // Transfer NFT to user
         stakingNFT.safeTransferFrom(address(this), msg.sender, id);
-        delete _balances[msg.sender][index];
     }
 
     function depositRewardTokens(uint256[] memory amount) external payable onlyOwner
@@ -273,7 +287,7 @@ contract NFTMultiStake is ReentrancyGuard, Ownable {
 
         uint256 balance = IERC20(token).balanceOf(address(this));
         uint256 tokenIndex = _totalRewardTokens - 1;
-        
+
         require(balance >= rewardAmounts[tokenIndex], "Not enough for rewards");
         rewardAmounts[tokenIndex] = balance - _totalSupply;
 
