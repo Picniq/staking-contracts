@@ -10,7 +10,7 @@ There are currently three contracts in the repo.
 
 1. Standard staking. Allows one staking token and one reward token.
 2. Multi-reward staking. Allows one staking token and multiple reward tokens.
-3. NFTMultiStake. A multi-reward staking contract for NFTs.
+3. NFTMultiStake. A multi-reward staking contract for NFTs (ERC721).
 
 ## TBD
 
