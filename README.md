@@ -6,7 +6,7 @@ These contracts are based off Synthetix's original staking contracts. You can fi
 
 ## Contracts
 
-There are currently two contracts in the repo.
+There are currently three contracts in the repo.
 
 1. Standard staking. Allows one staking token and one reward token.
 2. Multi-reward staking. Allows one staking token and multiple reward tokens.
