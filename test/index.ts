@@ -93,10 +93,14 @@ describe("MultiRewardsStake", function () {
     expect(await stake.owner()).to.equal(accounts[1].address);
 
     await makeSwap(accounts[1], [WETH, QFI], '1.0');
+    await makeSwap(accounts[1], [WETH, UST], '1.0');
     await transfer(QFI, accounts[1], stake.address, await getBalance(QFI, accounts[1].address));
+    await transfer(UST, accounts[1], stake.address, await getBalance(UST, accounts[1].address));
     await stake.connect(accounts[1]).addRewardToken(QFI);
-
     expect((await stake.getRewardTokens()).length).to.equal(3);
+    await stake.connect(accounts[1]).addRewardToken(UST);
+
+    expect((await stake.getRewardTokens()).length).to.equal(4);
 
     await ethers.provider.send('evm_mine', []);
 
@@ -109,6 +113,8 @@ describe("MultiRewardsStake", function () {
     expect(Number(rewardPerToken[0])).to.greaterThan(0);
     expect(Number(rewardPerToken[1])).to.greaterThan(0);
     expect(Number(rewardPerToken[2])).to.greaterThan(0);
+
+    await stake.connect(accounts[0]).getReward();
   
   });
 });
