@@ -23,8 +23,11 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 // Go to https://hardhat.org/config/ to learn more
 
 const config: HardhatUserConfig = {
+  mocha: {
+    timeout: 100000
+  },
   solidity: {
-    version: "0.8.13",
+    version: "0.8.14",
     settings: {
       optimizer: {
         enabled: true,
