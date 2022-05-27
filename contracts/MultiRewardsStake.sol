@@ -1,15 +1,14 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.14;
 
-import "./helpers/ReentrancyGuard.sol";
 import "./helpers/Ownable.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/Math.sol";
 import "./libraries/SafeERC20.sol";
 
-//solhint-disable not-rely-on-time
-contract MultiRewardsStake is ReentrancyGuard, Ownable {
+// solhint-disable not-rely-on-time
+contract MultiRewardsStake is Ownable {
     using SafeERC20 for IERC20;
 
     // Base staking info
