@@ -69,11 +69,15 @@ describe("MultiRewardsStake", function () {
     
     const earned1 = await stake.earned(accounts[0].address);
     const earned2 = await stake.earned(accounts[1].address);
+    await stake.getReward();
 
     expect(Number(ethers.utils.formatUnits(earned1[0], 'gwei'))).to.greaterThan(0);
     expect(Number(ethers.utils.formatUnits(earned1[1], 'gwei'))).to.greaterThan(0);
     expect(Number(ethers.utils.formatUnits(earned2[0], 'gwei'))).to.greaterThan(0);
     expect(Number(ethers.utils.formatUnits(earned2[1], 'gwei'))).to.greaterThan(0);
+
+        console.log(await getBalance(QFI, accounts[0].address), await getBalance(UST, accounts[0].address));
+    console.log(await getBalance(LINK, accounts[0].address), await getBalance(SHIB, accounts[0].address));
 
     await ethers.provider.send('evm_mine', []);
     await ethers.provider.send('evm_mine', []);
@@ -96,6 +100,8 @@ describe("MultiRewardsStake", function () {
     await makeSwap(accounts[1], [WETH, UST], '1.0');
     await transfer(QFI, accounts[1], stake.address, await getBalance(QFI, accounts[1].address));
     await transfer(UST, accounts[1], stake.address, await getBalance(UST, accounts[1].address));
+    console.log(await getBalance(QFI, accounts[0].address), await getBalance(UST, accounts[0].address));
+    console.log(await getBalance(LINK, accounts[0].address), await getBalance(SHIB, accounts[0].address));
     await stake.connect(accounts[1]).addRewardToken(QFI);
     expect((await stake.getRewardTokens()).length).to.equal(3);
     await stake.connect(accounts[1]).addRewardToken(UST);
@@ -115,6 +121,8 @@ describe("MultiRewardsStake", function () {
     expect(Number(rewardPerToken[2])).to.greaterThan(0);
 
     await stake.connect(accounts[0]).getReward();
-  
+    await stake.exit();
+    console.log(await getBalance(QFI, accounts[0].address), await getBalance(UST, accounts[0].address));
+    console.log(await getBalance(LINK, accounts[0].address), await getBalance(SHIB, accounts[0].address));
   });
 });

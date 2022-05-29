@@ -43,11 +43,11 @@ async function main() {
 
   await qfiContract.connect(accounts[0]).transfer(stake.address, depositAmount);
 
-  await (await stake.connect(accounts[0]).notifyRewardAmount(depositAmount)).wait();
+  await stake.connect(accounts[0]).notifyRewardAmount(depositAmount);
 
-  await (await qfiContract.connect(accounts[0]).approve(stake.address, stakeAmount)).wait();
+  await qfiContract.connect(accounts[0]).approve(stake.address, stakeAmount);
 
-  await (await stake.connect(accounts[0]).stake(stakeAmount)).wait();
+  await stake.connect(accounts[0]).stake(stakeAmount);
   console.log(await stake.getRewardForDuration());
 
   for (let i = 0; i < 6500; i++) {
@@ -58,26 +58,20 @@ async function main() {
   console.log(await stake.earned(accounts[0].address));
   console.log(await stake.earned(accounts[1].address));
 
-  for (let i = 0; i < 6500; i++) {
-    await ethers.provider.send("evm_mine", []);
-  }
   await ethers.provider.send("evm_increaseTime", [86400]);
+  await ethers.provider.send("evm_mine", []);
 
   console.log(await stake.earned(accounts[0].address));
   console.log(await stake.earned(accounts[1].address));
 
-  for (let i = 0; i < 6500; i++) {
-    await ethers.provider.send("evm_mine", []);
-  }
   await ethers.provider.send("evm_increaseTime", [86400]);
+  await ethers.provider.send("evm_mine", []);
 
   console.log(await stake.earned(accounts[0].address));
   console.log(await stake.earned(accounts[1].address));
 
-  for (let i = 0; i < 6500; i++) {
-    await ethers.provider.send("evm_mine", []);
-  }
   await ethers.provider.send("evm_increaseTime", [86400]);
+  await ethers.provider.send("evm_mine", []);
 
   console.log(await stake.earned(accounts[0].address));
   console.log(await stake.earned(accounts[1].address));
