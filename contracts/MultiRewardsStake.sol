@@ -397,6 +397,8 @@ contract MultiRewardsStake is Ownable {
      */
     function removeRewardToken(address token) public payable onlyOwner updateReward(address(0)) {
         require(_totalRewardTokens > 1, "Cannot have 0 reward tokens");
+        require(_rewardTokenToIndex[token] > 0, "Not a reward token");
+
         // Get the index of token to remove
         uint indexToDelete = _rewardTokenToIndex[token];
 
@@ -429,8 +431,14 @@ contract MultiRewardsStake is Ownable {
     function emergencyWithdrawal(address token) external payable onlyOwner updateReward(address(0)) {
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance > 0, "Contract holds no tokens");
+        if (token == address(stakingToken)) {
+            balance -= _totalSupply;
+        }
         IERC20(token).transfer(owner(), balance);
-        removeRewardToken(token);
+
+        if (_rewardTokenToIndex[token] > 0) {
+            removeRewardToken(token);    
+        }
     }
 
     /**
