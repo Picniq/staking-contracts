@@ -1,9 +1,18 @@
 {
   "name": "picniq-staking-contracts",
-  "author": {"name": "danq.eth", "email": "team@picniq.io"},
+  "author": {
+    "name": "danq.eth",
+    "email": "team@picniq.io"
+  },
   "description": "Repository of various staking contracts for public use",
   "homepage": "picniq.io",
-  "keywords": ["etheruem", "defi", "staking", "smart contract", "erc20"],
+  "keywords": [
+    "etheruem",
+    "defi",
+    "staking",
+    "smart contract",
+    "erc20"
+  ],
   "scripts": {
     "test": "yarn exec hardhat test",
     "build": "yarn exec hardhat compile",
