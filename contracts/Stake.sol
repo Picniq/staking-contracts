@@ -2,12 +2,13 @@
 
 pragma solidity 0.8.14;
 
+import "./helpers/ReentrancyGuard.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/Math.sol";
 import "./libraries/SafeERC20.sol";
 
 // solhint-disable not-rely-on-time
-contract SingleAssetStake {
+contract SingleAssetStake is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     RewardState private _state;
@@ -77,16 +78,16 @@ contract SingleAssetStake {
         return _state.rewardRate * _state.rewardsDuration;
     }
 
-    function stake(uint256 amount) external payable updateReward(msg.sender)
+    function stake(uint256 amount) external payable nonReentrant updateReward(msg.sender)
     {
         require(amount > 0, "Must be greater than zero");
         _totalSupply += amount;
-        rewardToken.safeTransferFrom(msg.sender, address(this), amount);
+        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
         _balances[msg.sender] += amount;
         emit Staked(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) public payable updateReward(msg.sender)
+    function withdraw(uint256 amount) public payable nonReentrant updateReward(msg.sender)
     {
         require(amount > 0, "Must be greater than zero");
 
@@ -97,7 +98,7 @@ contract SingleAssetStake {
         emit Withdrawn(msg.sender, amount);
     }
 
-    function getReward() public updateReward(msg.sender)
+    function getReward() public nonReentrant updateReward(msg.sender)
     {
         uint256 reward = _rewards[msg.sender];
 
@@ -129,7 +130,7 @@ contract SingleAssetStake {
         } else {
             uint256 remaining = periodFinish - timestamp;
             uint256 leftover = remaining * rewardRate;
-            _state.rewardRate = (rewardRate + leftover) / duration;
+            _state.rewardRate = (reward + leftover) / duration;
         }
 
         uint256 balance = rewardToken.balanceOf(address(this));
